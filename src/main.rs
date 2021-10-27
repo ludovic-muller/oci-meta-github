@@ -1,6 +1,19 @@
+use anyhow::Context;
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::{cmp, str::FromStr};
 
 use semver::Semver;
+
+lazy_static! {
+    static ref RE: Regex = Regex::new(r"^refs/(?P<kind>[a-z]+)/(?P<name>.+)$").unwrap();
+}
+
+#[derive(Debug, Default, Clone)]
+struct GitHubRef {
+    kind: String,
+    name: String,
+}
 
 fn github_print(output_name: &str, value: String) {
     println!("::set-output name={}::{}", output_name, value);
@@ -20,8 +33,27 @@ fn short_sha(github_sha: &str) -> &str {
     &github_sha[..end]
 }
 
+fn parse_github_ref(github_ref: &str) -> anyhow::Result<GitHubRef> {
+    let caps = RE.captures(github_ref).context("invalid GitHub ref")?;
+
+    Ok(GitHubRef {
+        kind: caps["kind"].to_string().trim().to_lowercase(),
+        name: caps["name"].to_string().trim().to_lowercase(),
+    })
+}
+
 fn get_branch(github_ref: &str) -> Option<String> {
-    None
+    let github_ref = parse_github_ref(github_ref);
+    match github_ref {
+        Ok(gh_ref) => {
+            if gh_ref.kind == "heads" {
+                Some(gh_ref.name)
+            } else {
+                None
+            }
+        }
+        Err(_) => None,
+    }
 }
 
 fn get_tag(github_ref: &str) -> Option<String> {
@@ -41,7 +73,7 @@ fn main() -> anyhow::Result<()> {
     let branch = get_branch(github_ref);
     let tag = get_tag(github_ref);
     let is_latest = match branch {
-        Some(b) => b == default_branch,
+        Some(ref b) => b == &default_branch.to_lowercase(),
         None => false,
     };
 
@@ -59,14 +91,26 @@ fn main() -> anyhow::Result<()> {
             tags.push(',');
         }
 
+        // those tags will always be present
         tags.push_str(&format!(
             "{}pipeline-{},{}git-{}",
             prefix, github_run_id, prefix, sha
         ));
-        if is_latest {
-            tags.push_str(&format!(",{}latest", prefix));
+
+        // case for branch
+        if let Some(ref b) = branch {
+            let b = &b.replace("/", "-");
+            tags.push_str(&format!(
+                ",{}branch-{},{}git-{}-{}",
+                prefix, &b, prefix, &b, sha
+            ));
+
+            if is_latest {
+                tags.push_str(&format!(",{}latest", prefix));
+            }
         }
 
+        // case for tag
         if let Some(ref tag) = tag {
             if let Ok(version) = Semver::from_str(tag) {
                 let version_tags = version.single_line(v_prefix);
