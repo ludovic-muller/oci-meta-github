@@ -42,11 +42,10 @@ fn parse_github_ref(github_ref: &str) -> anyhow::Result<GitHubRef> {
     })
 }
 
-fn get_branch(github_ref: &str) -> Option<String> {
-    let github_ref = parse_github_ref(github_ref);
+fn get_github_ref_type(github_ref: anyhow::Result<GitHubRef>, kind: &str) -> Option<String> {
     match github_ref {
         Ok(gh_ref) => {
-            if gh_ref.kind == "heads" {
+            if gh_ref.kind == kind {
                 Some(gh_ref.name)
             } else {
                 None
@@ -56,14 +55,18 @@ fn get_branch(github_ref: &str) -> Option<String> {
     }
 }
 
+fn get_branch(github_ref: &str) -> Option<String> {
+    get_github_ref_type(parse_github_ref(github_ref), "heads")
+}
+
 fn get_tag(github_ref: &str) -> Option<String> {
-    None
+    get_github_ref_type(parse_github_ref(github_ref), "tags")
 }
 
 fn main() -> anyhow::Result<()> {
     // should be passed as environment variables
     let default_branch = "main";
-    let github_ref = "refs/heads/feature-branch-1";
+    let github_ref = "refs/tags/v1.2.3";
     let github_run_id = "42";
     let github_sha = "abcdefghijklmnopqrstuvwxyz";
     let images = "example.com/org/image,example.com/org/image2";
