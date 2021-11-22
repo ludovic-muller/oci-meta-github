@@ -42,25 +42,22 @@ fn parse_github_ref(github_ref: &str) -> anyhow::Result<GitHubRef> {
     })
 }
 
-fn get_github_ref_type(github_ref: anyhow::Result<GitHubRef>, kind: &str) -> Option<String> {
-    match github_ref {
-        Ok(gh_ref) => {
-            if gh_ref.kind == kind {
-                Some(gh_ref.name)
-            } else {
-                None
-            }
-        }
-        Err(_) => None,
+fn get_github_ref_type(github_ref: GitHubRef, kind: &str) -> Option<String> {
+    if github_ref.kind == kind {
+        Some(github_ref.name)
+    } else {
+        None
     }
 }
 
 fn get_branch(github_ref: &str) -> Option<String> {
-    get_github_ref_type(parse_github_ref(github_ref), "heads")
+    let gh_ref = parse_github_ref(github_ref).ok()?;
+    get_github_ref_type(gh_ref, "heads")
 }
 
 fn get_tag(github_ref: &str) -> Option<String> {
-    get_github_ref_type(parse_github_ref(github_ref), "tags")
+    let gh_ref = parse_github_ref(github_ref).ok()?;
+    get_github_ref_type(gh_ref, "tags")
 }
 
 fn main() -> anyhow::Result<()> {
@@ -83,6 +80,11 @@ fn main() -> anyhow::Result<()> {
 
     // results will be stored there
     let mut tags = String::from("");
+    let labels = branch
+        .as_deref()
+        .or_else(|| tag.as_deref())
+        .unwrap_or("latest");
+    let labels = format!("org.opencontainers.image.version={}", labels);
 
     // loop over all images
     let images = images.split(',');
@@ -128,6 +130,7 @@ fn main() -> anyhow::Result<()> {
 
     // print output
     github_print("tags", tags);
+    github_print("labels", labels);
 
     Ok(())
 }
