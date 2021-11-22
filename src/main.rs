@@ -69,6 +69,7 @@ fn main() -> anyhow::Result<()> {
     let github_ref = "refs/tags/v1.2.3";
     let github_run_id = "42";
     let github_sha = "abcdefghijklmnopqrstuvwxyz";
+    let enable_git_branch_tag = false;
     let images = "example.com/org/image,example.com/org/image2";
 
     // some computed values
@@ -103,10 +104,11 @@ fn main() -> anyhow::Result<()> {
         // case for branch
         if let Some(ref b) = branch {
             let b = &b.replace("/", "-");
-            tags.push_str(&format!(
-                ",{}branch-{},{}git-{}-{}",
-                prefix, &b, prefix, &b, sha
-            ));
+
+            tags.push_str(&format!(",{}branch-{}", prefix, &b));
+            if enable_git_branch_tag {
+                tags.push_str(&format!(",{}git-{}-{}", prefix, &b, sha));
+            }
 
             if is_latest {
                 tags.push_str(&format!(",{}latest", prefix));
